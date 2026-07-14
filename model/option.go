@@ -39,6 +39,7 @@ func InitOptionMap() {
 	common.OptionMap["PasswordLoginEnabled"] = strconv.FormatBool(common.PasswordLoginEnabled)
 	common.OptionMap["PasswordRegisterEnabled"] = strconv.FormatBool(common.PasswordRegisterEnabled)
 	common.OptionMap["EmailVerificationEnabled"] = strconv.FormatBool(common.EmailVerificationEnabled)
+	common.OptionMap["RegistrationCodeEnabled"] = strconv.FormatBool(common.RegistrationCodeEnabled)
 	common.OptionMap["GitHubOAuthEnabled"] = strconv.FormatBool(common.GitHubOAuthEnabled)
 	common.OptionMap["LinuxDOOAuthEnabled"] = strconv.FormatBool(common.LinuxDOOAuthEnabled)
 	common.OptionMap["TelegramOAuthEnabled"] = strconv.FormatBool(common.TelegramOAuthEnabled)
@@ -116,6 +117,11 @@ func InitOptionMap() {
 	common.OptionMap["WaffoPancakeMinTopUp"] = strconv.Itoa(setting.WaffoPancakeMinTopUp)
 	common.OptionMap["WaffoPancakeStoreID"] = setting.WaffoPancakeStoreID
 	common.OptionMap["WaffoPancakeProductID"] = setting.WaffoPancakeProductID
+	common.OptionMap["LinuxDOCreditEnabled"] = strconv.FormatBool(setting.LinuxDOCreditEnabled)
+	common.OptionMap["LinuxDOCreditPayAddress"] = setting.LinuxDOCreditPayAddress
+	common.OptionMap["LinuxDOCreditClientId"] = setting.LinuxDOCreditClientId
+	common.OptionMap["LinuxDOCreditClientSecret"] = setting.LinuxDOCreditClientSecret
+	common.OptionMap["LinuxDOCreditMinTopUp"] = strconv.Itoa(setting.LinuxDOCreditMinTopUp)
 	common.OptionMap["TopupGroupRatio"] = common.TopupGroupRatio2JSONString()
 	common.OptionMap["Chats"] = setting.Chats2JsonString()
 	common.OptionMap["AutoGroups"] = setting.AutoGroups2JsonString()
@@ -286,6 +292,8 @@ func updateOptionMap(key string, value string) (err error) {
 			common.PasswordLoginEnabled = boolValue
 		case "EmailVerificationEnabled":
 			common.EmailVerificationEnabled = boolValue
+		case "RegistrationCodeEnabled":
+			common.RegistrationCodeEnabled = boolValue
 		case "GitHubOAuthEnabled":
 			common.GitHubOAuthEnabled = boolValue
 		case "LinuxDOOAuthEnabled":
@@ -468,6 +476,20 @@ func updateOptionMap(key string, value string) (err error) {
 		setting.WaffoPancakeUnitPrice, _ = strconv.ParseFloat(value, 64)
 	case "WaffoPancakeMinTopUp":
 		setting.WaffoPancakeMinTopUp, _ = strconv.Atoi(value)
+	case "LinuxDOCreditEnabled":
+		setting.LinuxDOCreditEnabled = value == "true"
+	case "LinuxDOCreditPayAddress":
+		if strings.TrimSpace(value) == "" {
+			setting.LinuxDOCreditPayAddress = setting.LinuxDOCreditDefaultPayAddress
+		} else {
+			setting.LinuxDOCreditPayAddress = value
+		}
+	case "LinuxDOCreditClientId":
+		setting.LinuxDOCreditClientId = value
+	case "LinuxDOCreditClientSecret":
+		setting.LinuxDOCreditClientSecret = value
+	case "LinuxDOCreditMinTopUp":
+		setting.LinuxDOCreditMinTopUp, _ = strconv.Atoi(value)
 	case "TopupGroupRatio":
 		err = common.UpdateTopupGroupRatioByJSONString(value)
 	case "GitHubClientId":

@@ -89,14 +89,27 @@ export async function githubOAuthStart(clientId: string, state: string) {
 export async function getOAuthState(): Promise<string> {
   const aff =
     typeof window !== 'undefined' ? (localStorage.getItem('aff') ?? '') : ''
-  const res = await api.get('/api/oauth/state', { params: { aff } })
+  const registrationCode =
+    typeof window !== 'undefined'
+      ? (localStorage.getItem('registration_code') ?? '')
+      : ''
+  const res = await api.get('/api/oauth/state', {
+    params: { aff, registration_code: registrationCode },
+  })
   if (res.data?.success) return res.data.data
   return ''
 }
 
 // WeChat login by authorization code
 export async function wechatLoginByCode(code: string): Promise<ApiResponse> {
-  const res = await api.get('/api/oauth/wechat', { params: { code } })
+  const registrationCode =
+    typeof window !== 'undefined'
+      ? (localStorage.getItem('registration_code') ?? '')
+      : ''
+  const res = await api.get('/api/oauth/wechat', {
+    params: { code, registration_code: registrationCode },
+    skipBusinessError: true,
+  })
   return res.data
 }
 
@@ -108,6 +121,7 @@ export async function wechatLoginByCode(code: string): Promise<ApiResponse> {
 export async function register(payload: RegisterPayload): Promise<ApiResponse> {
   const res = await api.post(`/api/user/register`, payload, {
     params: { turnstile: payload.turnstile ?? '' },
+    skipBusinessError: true,
   })
   return res.data
 }

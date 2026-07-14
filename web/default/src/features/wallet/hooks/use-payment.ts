@@ -22,14 +22,17 @@ import { toast } from 'sonner'
 
 import {
   calculateAmount,
+  calculateLinuxDOCreditAmount,
   calculateStripeAmount,
   calculateWaffoPancakeAmount,
+  requestLinuxDOCreditPayment,
   requestPayment,
   requestStripePayment,
   isApiSuccess,
 } from '../api'
 import {
   isStripePayment,
+  isLinuxDOCreditPayment,
   isWaffoPancakePayment,
   submitPaymentForm,
 } from '../lib'
@@ -51,10 +54,13 @@ export function usePayment() {
 
         const isStripe = isStripePayment(paymentType)
         const isPancake = isWaffoPancakePayment(paymentType)
+        const isLinuxDOCredit = isLinuxDOCreditPayment(paymentType)
         const response = isStripe
           ? await calculateStripeAmount({ amount: topupAmount })
           : isPancake
             ? await calculateWaffoPancakeAmount({ amount: topupAmount })
+            : isLinuxDOCredit
+              ? await calculateLinuxDOCreditAmount({ amount: topupAmount })
             : await calculateAmount({ amount: topupAmount })
 
         if (isApiSuccess(response) && response.data) {
@@ -83,6 +89,7 @@ export function usePayment() {
         setProcessing(true)
 
         const isStripe = isStripePayment(paymentType)
+        const isLinuxDOCredit = isLinuxDOCreditPayment(paymentType)
         const amount = Math.floor(topupAmount)
 
         const response = isStripe
@@ -90,6 +97,8 @@ export function usePayment() {
               amount,
               payment_method: 'stripe',
             })
+          : isLinuxDOCredit
+            ? await requestLinuxDOCreditPayment({ amount })
           : await requestPayment({
               amount,
               payment_method: paymentType,

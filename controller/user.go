@@ -203,6 +203,7 @@ func Register(c *gin.Context) {
 	}
 	user.Username = strings.TrimSpace(user.Username)
 	user.Email = model.NormalizeEmail(user.Email)
+	registrationCode := strings.TrimSpace(user.RegistrationCode)
 	if user.Username == "" {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
@@ -228,6 +229,10 @@ func Register(c *gin.Context) {
 			common.ApiErrorI18n(c, i18n.MsgDatabaseError)
 			return
 		}
+	}
+	if common.RegistrationCodeEnabled && registrationCode == "" {
+		common.ApiErrorI18n(c, i18n.MsgRegistrationCodeNotProvided)
+		return
 	}
 	emailForExistCheck := ""
 	if common.EmailVerificationEnabled {
@@ -255,7 +260,19 @@ func Register(c *gin.Context) {
 	if common.EmailVerificationEnabled {
 		cleanUser.Email = user.Email
 	}
-	if err := cleanUser.Insert(inviterId); err != nil {
+	if err := model.DB.Transaction(func(tx *gorm.DB) error {
+		if err := cleanUser.InsertWithTx(tx, inviterId); err != nil {
+			return err
+		}
+		if common.RegistrationCodeEnabled {
+			return model.UseRegistrationCodeWithTx(tx, registrationCode, cleanUser.Id)
+		}
+		return nil
+	}); err != nil {
+		if msgKey := registrationCodeMessageKey(err); msgKey != "" {
+			common.ApiErrorI18n(c, msgKey)
+			return
+		}
 		if errors.Is(err, model.ErrEmailAlreadyTaken) {
 			common.ApiErrorI18n(c, i18n.MsgUserEmailAlreadyTaken)
 			return
@@ -263,10 +280,9 @@ func Register(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	cleanUser.FinishInsert(inviterId)
 
-	// 获取插入后的用户ID
-	var insertedUser model.User
-	if err := model.DB.Where("username = ?", cleanUser.Username).First(&insertedUser).Error; err != nil {
+	if cleanUser.Id == 0 {
 		common.ApiErrorI18n(c, i18n.MsgUserRegisterFailed)
 		return
 	}
@@ -280,7 +296,7 @@ func Register(c *gin.Context) {
 		}
 		// 生成默认令牌
 		token := model.Token{
-			UserId:             insertedUser.Id, // 使用插入后的用户ID
+			UserId:             cleanUser.Id,
 			Name:               cleanUser.Username + "的初始令牌",
 			Key:                key,
 			CreatedTime:        common.GetTimestamp(),

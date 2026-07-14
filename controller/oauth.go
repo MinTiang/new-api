@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/i18n"
@@ -27,6 +28,12 @@ func GenerateOAuthCode(c *gin.Context) {
 	affCode := c.Query("aff")
 	if affCode != "" {
 		session.Set("aff", affCode)
+	}
+	registrationCode := strings.TrimSpace(c.Query("registration_code"))
+	if registrationCode != "" {
+		session.Set("registration_code", registrationCode)
+	} else {
+		session.Delete("registration_code")
 	}
 	session.Set("oauth_state", state)
 	err := session.Save()
@@ -109,6 +116,10 @@ func HandleOAuth(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, model.ErrEmailAlreadyTaken) {
 			common.ApiErrorI18n(c, i18n.MsgUserEmailAlreadyTaken)
+			return
+		}
+		if msgKey := registrationCodeMessageKey(err); msgKey != "" {
+			common.ApiErrorI18n(c, msgKey)
 			return
 		}
 		switch err.(type) {
@@ -243,6 +254,15 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 	if !common.RegisterEnabled {
 		return nil, &OAuthRegistrationDisabledError{}
 	}
+	registrationCode := ""
+	if common.RegistrationCodeEnabled {
+		if rawCode, ok := session.Get("registration_code").(string); ok {
+			registrationCode = strings.TrimSpace(rawCode)
+		}
+		if registrationCode == "" {
+			return nil, model.ErrRegistrationCodeNotProvided
+		}
+	}
 
 	// Set up new user
 	user.Username = provider.GetProviderPrefix() + strconv.Itoa(model.GetMaxUserId()+1)
@@ -290,6 +310,11 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 			if err := user.InsertWithTx(tx, inviterId); err != nil {
 				return err
 			}
+			if common.RegistrationCodeEnabled {
+				if err := model.UseRegistrationCodeWithTx(tx, registrationCode, user.Id); err != nil {
+					return err
+				}
+			}
 
 			// Create OAuth binding
 			binding := &model.UserOAuthBinding{
@@ -316,6 +341,11 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 			if err := user.InsertWithTx(tx, inviterId); err != nil {
 				return err
 			}
+			if common.RegistrationCodeEnabled {
+				if err := model.UseRegistrationCodeWithTx(tx, registrationCode, user.Id); err != nil {
+					return err
+				}
+			}
 
 			// Set the provider user ID on the user model and update
 			provider.SetProviderUserID(user, oauthUser.ProviderUserID)
@@ -338,6 +368,10 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 
 		// Perform post-transaction tasks
 		user.FinalizeOAuthUserCreation(inviterId)
+	}
+	if common.RegistrationCodeEnabled {
+		session.Delete("registration_code")
+		_ = session.Save()
 	}
 
 	return user, nil

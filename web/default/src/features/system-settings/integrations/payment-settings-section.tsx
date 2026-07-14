@@ -159,6 +159,15 @@ const paymentSchema = z.object({
       })
     }
   }),
+  LinuxDOCreditEnabled: z.boolean(),
+  LinuxDOCreditPayAddress: z.string().refine((value) => {
+    const trimmed = value.trim()
+    if (!trimmed) return true
+    return /^https?:\/\//.test(trimmed)
+  }, 'Provide a valid payment URL starting with http:// or https://'),
+  LinuxDOCreditClientId: z.string(),
+  LinuxDOCreditClientSecret: z.string(),
+  LinuxDOCreditMinTopUp: z.coerce.number().min(1),
   WaffoEnabled: z.boolean(),
   WaffoApiKey: z.string(),
   WaffoPrivateKey: z.string(),
@@ -437,6 +446,13 @@ export function PaymentSettingsSection({
       CreemWebhookSecret: values.CreemWebhookSecret.trim(),
       CreemTestMode: values.CreemTestMode,
       CreemProducts: values.CreemProducts.trim(),
+      LinuxDOCreditEnabled: values.LinuxDOCreditEnabled,
+      LinuxDOCreditPayAddress:
+        removeTrailingSlash(values.LinuxDOCreditPayAddress.trim()) ||
+        'https://credit.linux.do/epay/pay',
+      LinuxDOCreditClientId: values.LinuxDOCreditClientId.trim(),
+      LinuxDOCreditClientSecret: values.LinuxDOCreditClientSecret.trim(),
+      LinuxDOCreditMinTopUp: values.LinuxDOCreditMinTopUp,
       WaffoEnabled: values.WaffoEnabled,
       WaffoSandbox: values.WaffoSandbox,
       WaffoMerchantId: values.WaffoMerchantId.trim(),
@@ -482,6 +498,14 @@ export function PaymentSettingsSection({
       CreemWebhookSecret: initialRef.current.CreemWebhookSecret.trim(),
       CreemTestMode: initialRef.current.CreemTestMode,
       CreemProducts: initialRef.current.CreemProducts.trim(),
+      LinuxDOCreditEnabled: initialRef.current.LinuxDOCreditEnabled,
+      LinuxDOCreditPayAddress:
+        removeTrailingSlash(initialRef.current.LinuxDOCreditPayAddress.trim()) ||
+        'https://credit.linux.do/epay/pay',
+      LinuxDOCreditClientId: initialRef.current.LinuxDOCreditClientId.trim(),
+      LinuxDOCreditClientSecret:
+        initialRef.current.LinuxDOCreditClientSecret.trim(),
+      LinuxDOCreditMinTopUp: initialRef.current.LinuxDOCreditMinTopUp,
       WaffoEnabled: initialRef.current.WaffoEnabled,
       WaffoSandbox: initialRef.current.WaffoSandbox,
       WaffoMerchantId: initialRef.current.WaffoMerchantId.trim(),
@@ -627,6 +651,43 @@ export function PaymentSettingsSection({
       normalizeJsonForComparison(initial.CreemProducts)
     ) {
       updates.push({ key: 'CreemProducts', value: sanitized.CreemProducts })
+    }
+
+    if (sanitized.LinuxDOCreditEnabled !== initial.LinuxDOCreditEnabled) {
+      updates.push({
+        key: 'LinuxDOCreditEnabled',
+        value: sanitized.LinuxDOCreditEnabled,
+      })
+    }
+
+    if (
+      sanitized.LinuxDOCreditPayAddress !== initial.LinuxDOCreditPayAddress
+    ) {
+      updates.push({
+        key: 'LinuxDOCreditPayAddress',
+        value: sanitized.LinuxDOCreditPayAddress,
+      })
+    }
+
+    if (sanitized.LinuxDOCreditClientId !== initial.LinuxDOCreditClientId) {
+      updates.push({
+        key: 'LinuxDOCreditClientId',
+        value: sanitized.LinuxDOCreditClientId,
+      })
+    }
+
+    if (sanitized.LinuxDOCreditClientSecret) {
+      updates.push({
+        key: 'LinuxDOCreditClientSecret',
+        value: sanitized.LinuxDOCreditClientSecret,
+      })
+    }
+
+    if (sanitized.LinuxDOCreditMinTopUp !== initial.LinuxDOCreditMinTopUp) {
+      updates.push({
+        key: 'LinuxDOCreditMinTopUp',
+        value: sanitized.LinuxDOCreditMinTopUp,
+      })
     }
 
     if (sanitized.WaffoEnabled !== initial.WaffoEnabled) {
@@ -877,9 +938,12 @@ export function PaymentSettingsSection({
           />
           <Tabs defaultValue='general' className='min-w-0'>
             <div className='overflow-x-auto pb-1'>
-              <TabsList className='grid min-w-[44rem] grid-cols-6'>
+              <TabsList className='grid min-w-[52rem] grid-cols-7'>
                 <TabsTrigger value='general'>{t('General')}</TabsTrigger>
                 <TabsTrigger value='epay'>Epay</TabsTrigger>
+                <TabsTrigger value='linuxdo-credit'>
+                  LINUX DO Credit
+                </TabsTrigger>
                 <TabsTrigger value='stripe'>{t('Stripe')}</TabsTrigger>
                 <TabsTrigger value='creem'>Creem</TabsTrigger>
                 <TabsTrigger value='waffo-pancake'>Waffo Pancake</TabsTrigger>
@@ -998,7 +1062,7 @@ export function PaymentSettingsSection({
                       </FormControl>
                       <FormDescription>
                         {t(
-                          'Configured as PayMethods JSON. The type value decides which payment flow is used: stripe for Stripe, waffo_pancake for Waffo Pancake, and other values are sent to Epay as the type parameter.'
+                          'Configured as PayMethods JSON. The type value decides which payment flow is used: stripe for Stripe, waffo_pancake for Waffo Pancake, linuxdo_credit for LINUX DO Credit, and other values are sent to Epay as the type parameter.'
                         )}
                       </FormDescription>
                       <FormMessage />
@@ -1223,6 +1287,158 @@ export function PaymentSettingsSection({
                           <Input
                             type='password'
                             placeholder={t('Enter new key to update')}
+                            autoComplete='new-password'
+                            {...field}
+                            onChange={(event) =>
+                              field.onChange(event.target.value)
+                            }
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          {t('Leave blank unless rotating the secret')}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent
+              value='linuxdo-credit'
+              className={paymentTabContentClassName}
+            >
+              <div className='space-y-4'>
+                <div>
+                  <h3 className='text-lg font-medium'>
+                    LINUX DO Credit
+                  </h3>
+                  <p className='text-muted-foreground text-sm'>
+                    {t('Configuration for LINUX DO Credit payment integration')}
+                  </p>
+                </div>
+
+                <div className='rounded-md bg-blue-50 p-4 text-sm text-blue-900 dark:bg-blue-950 dark:text-blue-100'>
+                  <p className='mb-2 font-medium'>
+                    {t('Webhook Configuration:')}
+                  </p>
+                  <ul className='list-inside list-disc space-y-1'>
+                    <li>
+                      {t('Webhook URL:')}{' '}
+                      <code className='rounded bg-blue-100 px-1 py-0.5 text-xs dark:bg-blue-900'>
+                        {'<ServerAddress>/api/user/linuxdo-credit/notify'}
+                      </code>
+                    </li>
+                    <li>
+                      {t(
+                        'Use the LINUX DO Credit Client ID as the merchant ID and Client Secret as the merchant key.'
+                      )}
+                    </li>
+                  </ul>
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name='LinuxDOCreditEnabled'
+                  render={({ field }) => (
+                    <SettingsSwitchItem>
+                      <SettingsSwitchContent>
+                        <FormLabel>{t('Enable LINUX DO Credit')}</FormLabel>
+                        <FormDescription>
+                          {t('Allow users to recharge with LINUX DO Credit')}
+                        </FormDescription>
+                      </SettingsSwitchContent>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </SettingsSwitchItem>
+                  )}
+                />
+
+                <div className='grid gap-6 md:grid-cols-2'>
+                  <FormField
+                    control={form.control}
+                    name='LinuxDOCreditPayAddress'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('Payment endpoint')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder='https://credit.linux.do/epay/pay'
+                            {...field}
+                            onChange={(event) =>
+                              field.onChange(event.target.value)
+                            }
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          {t(
+                            'LINUX DO Credit Epay-compatible endpoint. Keep the default unless the service changes it.'
+                          )}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name='LinuxDOCreditMinTopUp'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('Minimum top-up (USD)')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            type='number'
+                            step='1'
+                            min={1}
+                            {...safeNumberFieldProps(field)}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          {t('Minimum recharge amount in USD')}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className='grid gap-6 md:grid-cols-2'>
+                  <FormField
+                    control={form.control}
+                    name='LinuxDOCreditClientId'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('Client ID')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            autoComplete='off'
+                            {...field}
+                            onChange={(event) =>
+                              field.onChange(event.target.value)
+                            }
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name='LinuxDOCreditClientSecret'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('Client Secret')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            type='password'
+                            placeholder={t('Enter new secret to update')}
                             autoComplete='new-password'
                             {...field}
                             onChange={(event) =>

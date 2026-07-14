@@ -44,6 +44,11 @@ import { LegalConsent } from '@/features/auth/components/legal-consent'
 import { OAuthProviders } from '@/features/auth/components/oauth-providers'
 import { loginFormSchema } from '@/features/auth/constants'
 import { useAuthRedirect } from '@/features/auth/hooks/use-auth-redirect'
+import {
+  getRegistrationCode,
+  removeRegistrationCode,
+  saveRegistrationCode,
+} from '@/features/auth/lib/storage'
 import { useTurnstile } from '@/features/auth/hooks/use-turnstile'
 import { beginPasskeyLogin, finishPasskeyLogin } from '@/features/auth/passkey'
 import type { AuthFormProps } from '@/features/auth/types'
@@ -63,6 +68,9 @@ export function UserAuthForm({
   const { t } = useTranslation()
   const [isLoading, setIsLoading] = useState(false)
   const [wechatCode, setWeChatCode] = useState('')
+  const [registrationCode, setRegistrationCode] = useState(() =>
+    getRegistrationCode()
+  )
   const [agreedToLegal, setAgreedToLegal] = useState(false)
   const [passkeySupported, setPasskeySupported] = useState(false)
   const [isPasskeyLoading, setIsPasskeyLoading] = useState(false)
@@ -79,6 +87,9 @@ export function UserAuthForm({
     (status?.password_login_enabled ??
       status?.data?.password_login_enabled ??
       true) !== false
+  const registrationCodeEnabled = Boolean(
+    status?.registration_code_enabled ?? status?.data?.registration_code_enabled
+  )
   const {
     isTurnstileEnabled,
     turnstileSiteKey,
@@ -120,6 +131,15 @@ export function UserAuthForm({
       .then(setPasskeySupported)
       .catch(() => setPasskeySupported(false))
   }, [])
+
+  useEffect(() => {
+    const cleanCode = registrationCode.trim()
+    if (cleanCode) {
+      saveRegistrationCode(cleanCode)
+    } else {
+      removeRegistrationCode()
+    }
+  }, [registrationCode])
 
   const form = useForm<z.infer<typeof loginFormSchema>>({
     resolver: zodResolver(loginFormSchema),
@@ -165,6 +185,7 @@ export function UserAuthForm({
           return
         }
 
+        removeRegistrationCode()
         await handleLoginSuccess(res.data as { id?: number } | null, redirectTo)
         toast.success(t('Welcome back!'))
       }
@@ -202,6 +223,7 @@ export function UserAuthForm({
     try {
       const res = await wechatLoginByCode(wechatCode)
       if (res?.success) {
+        removeRegistrationCode()
         await handleLoginSuccess(res.data as { id?: number } | null, redirectTo)
         toast.success(t('Signed in via WeChat'))
         handleWeChatDialogChange(false)
@@ -269,6 +291,7 @@ export function UserAuthForm({
         finish.data as { id?: number } | null,
         redirectTo
       )
+      removeRegistrationCode()
       toast.success(t('Signed in with Passkey'))
     } catch (error: unknown) {
       if (error instanceof DOMException && error.name === 'NotAllowedError') {
@@ -310,6 +333,20 @@ export function UserAuthForm({
       )}
 
       {/* OAuth Providers */}
+      {registrationCodeEnabled && (hasOAuthLogin || hasWeChatLogin) && (
+        <div className='grid gap-2'>
+          <Label htmlFor='oauth-registration-code'>
+            {t('Registration Code')}
+          </Label>
+          <Input
+            id='oauth-registration-code'
+            placeholder={t('Enter your registration code')}
+            value={registrationCode}
+            onChange={(event) => setRegistrationCode(event.target.value)}
+            autoComplete='one-time-code'
+          />
+        </div>
+      )}
       <OAuthProviders
         status={status}
         disabled={isLoading || (requiresLegalConsent && !agreedToLegal)}

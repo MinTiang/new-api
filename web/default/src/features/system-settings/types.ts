@@ -125,6 +125,7 @@ export type AuthSettings = {
   PasswordLoginEnabled: boolean
   PasswordRegisterEnabled: boolean
   EmailVerificationEnabled: boolean
+  RegistrationCodeEnabled: boolean
   RegisterEnabled: boolean
   EmailDomainRestrictionEnabled: boolean
   EmailAliasRestrictionEnabled: boolean
@@ -325,6 +326,11 @@ export type BillingSettings = {
   // section (saved via /api/option/waffo-pancake/save).
   WaffoPancakeStoreID: string
   WaffoPancakeProductID: string
+  LinuxDOCreditEnabled: boolean
+  LinuxDOCreditPayAddress: string
+  LinuxDOCreditClientId: string
+  LinuxDOCreditClientSecret: string
+  LinuxDOCreditMinTopUp: number
   'checkin_setting.enabled': boolean
   'checkin_setting.min_quota': number
   'checkin_setting.max_quota': number

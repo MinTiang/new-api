@@ -39,6 +39,7 @@ import type {
   WaffoPaymentResponse,
   WaffoPancakePaymentRequest,
   WaffoPancakePaymentResponse,
+  LinuxDOCreditPaymentResponse,
 } from './types'
 
 // ============================================================================
@@ -167,6 +168,33 @@ export async function requestWaffoPancakePayment(
     skipBusinessError: true,
   } as Record<string, unknown>)
   return res.data
+}
+
+/**
+ * Calculate payment amount for LINUX DO Credit payment
+ */
+export async function calculateLinuxDOCreditAmount(
+  request: AmountRequest
+): Promise<AmountResponse> {
+  const res = await api.post('/api/user/linuxdo-credit/amount', request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return res.data
+}
+
+/**
+ * Request LINUX DO Credit payment
+ */
+export async function requestLinuxDOCreditPayment(
+  request: AmountRequest
+): Promise<LinuxDOCreditPaymentResponse> {
+  const res = await api.post('/api/user/linuxdo-credit/pay', request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return {
+    ...res.data,
+    url: res.data.url || (res as unknown as { url?: string }).url,
+  }
 }
 
 /**

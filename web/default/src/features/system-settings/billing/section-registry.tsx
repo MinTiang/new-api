@@ -152,6 +152,14 @@ const BILLING_SECTIONS = [
           CreemWebhookSecret: settings.CreemWebhookSecret,
           CreemTestMode: settings.CreemTestMode,
           CreemProducts: settings.CreemProducts,
+          LinuxDOCreditEnabled: settings.LinuxDOCreditEnabled ?? false,
+          LinuxDOCreditPayAddress:
+            settings.LinuxDOCreditPayAddress ??
+            'https://credit.linux.do/epay/pay',
+          LinuxDOCreditClientId: settings.LinuxDOCreditClientId ?? '',
+          LinuxDOCreditClientSecret:
+            settings.LinuxDOCreditClientSecret ?? '',
+          LinuxDOCreditMinTopUp: settings.LinuxDOCreditMinTopUp ?? 1,
         }}
         waffoDefaultValues={{
           WaffoEnabled: settings.WaffoEnabled ?? false,

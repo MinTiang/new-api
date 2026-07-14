@@ -75,6 +75,8 @@ func SetApiRouter(router *gin.Engine) {
 			userRoute.GET("/logout", controller.Logout)
 			userRoute.POST("/epay/notify", anonymousRequestBodyLimit, controller.EpayNotify)
 			userRoute.GET("/epay/notify", controller.EpayNotify)
+			userRoute.POST("/linuxdo-credit/notify", anonymousRequestBodyLimit, controller.LinuxDOCreditNotify)
+			userRoute.GET("/linuxdo-credit/notify", controller.LinuxDOCreditNotify)
 			userRoute.GET("/groups", controller.GetUserGroups)
 
 			selfRoute := userRoute.Group("/")
@@ -105,6 +107,8 @@ func SetApiRouter(router *gin.Engine) {
 				selfRoute.POST("/waffo/pay", middleware.CriticalRateLimit(), controller.RequestWaffoPay)
 				selfRoute.POST("/waffo-pancake/amount", controller.RequestWaffoPancakeAmount)
 				selfRoute.POST("/waffo-pancake/pay", middleware.CriticalRateLimit(), controller.RequestWaffoPancakePay)
+				selfRoute.POST("/linuxdo-credit/amount", controller.RequestLinuxDOCreditAmount)
+				selfRoute.POST("/linuxdo-credit/pay", middleware.CriticalRateLimit(), controller.RequestLinuxDOCreditPay)
 				selfRoute.POST("/aff_transfer", controller.TransferAffQuota)
 				selfRoute.PUT("/setting", controller.UpdateUserSetting)
 
@@ -263,6 +267,18 @@ func SetApiRouter(router *gin.Engine) {
 			redemptionRoute.PUT("/", controller.UpdateRedemption)
 			redemptionRoute.DELETE("/invalid", controller.DeleteInvalidRedemption)
 			redemptionRoute.DELETE("/:id", controller.DeleteRedemption)
+		}
+
+		registrationCodeRoute := apiRouter.Group("/registration-code")
+		registrationCodeRoute.Use(middleware.RootAuth())
+		{
+			registrationCodeRoute.GET("/", controller.GetAllRegistrationCodes)
+			registrationCodeRoute.GET("/search", controller.SearchRegistrationCodes)
+			registrationCodeRoute.GET("/:id", controller.GetRegistrationCode)
+			registrationCodeRoute.POST("/", controller.AddRegistrationCode)
+			registrationCodeRoute.PUT("/", controller.UpdateRegistrationCode)
+			registrationCodeRoute.DELETE("/invalid", controller.DeleteInvalidRegistrationCode)
+			registrationCodeRoute.DELETE("/:id", controller.DeleteRegistrationCode)
 		}
 		logRoute := apiRouter.Group("/log")
 		logRoute.GET("/", middleware.AdminAuth(), controller.GetAllLogs)

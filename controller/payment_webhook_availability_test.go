@@ -167,3 +167,29 @@ func TestEpayWebhookEnabledRequiresTopUpAndWebhookConfig(t *testing.T) {
 	operation_setting.PayMethods = nil
 	require.False(t, isEpayWebhookEnabled())
 }
+
+func TestLinuxDOCreditWebhookEnabledRequiresToggleAndCredentials(t *testing.T) {
+	confirmPaymentComplianceForTest(t)
+	originalEnabled := setting.LinuxDOCreditEnabled
+	originalPayAddress := setting.LinuxDOCreditPayAddress
+	originalClientID := setting.LinuxDOCreditClientId
+	originalClientSecret := setting.LinuxDOCreditClientSecret
+	t.Cleanup(func() {
+		setting.LinuxDOCreditEnabled = originalEnabled
+		setting.LinuxDOCreditPayAddress = originalPayAddress
+		setting.LinuxDOCreditClientId = originalClientID
+		setting.LinuxDOCreditClientSecret = originalClientSecret
+	})
+
+	setting.LinuxDOCreditEnabled = true
+	setting.LinuxDOCreditPayAddress = "https://credit.linux.do/epay"
+	setting.LinuxDOCreditClientId = "client_id"
+	setting.LinuxDOCreditClientSecret = ""
+	require.False(t, isLinuxDOCreditWebhookEnabled())
+
+	setting.LinuxDOCreditClientSecret = "client_secret"
+	require.True(t, isLinuxDOCreditWebhookEnabled())
+
+	setting.LinuxDOCreditEnabled = false
+	require.False(t, isLinuxDOCreditWebhookEnabled())
+}

@@ -47,7 +47,10 @@ import { useEmailVerification } from '@/features/auth/hooks/use-email-verificati
 import { useTurnstile } from '@/features/auth/hooks/use-turnstile'
 import {
   getAffiliateCode,
+  getRegistrationCode,
+  removeRegistrationCode,
   saveAffiliateCode,
+  saveRegistrationCode,
 } from '@/features/auth/lib/storage'
 import { useStatus } from '@/hooks/use-status'
 import { cn } from '@/lib/utils'
@@ -59,6 +62,9 @@ export function SignUpForm({
   const { t } = useTranslation()
   const [isLoading, setIsLoading] = useState(false)
   const [verificationCode, setVerificationCode] = useState('')
+  const [registrationCode, setRegistrationCode] = useState(() =>
+    getRegistrationCode()
+  )
   const [agreedToLegal, setAgreedToLegal] = useState(false)
   const [wechatCode, setWeChatCode] = useState('')
   const [isWeChatDialogOpen, setIsWeChatDialogOpen] = useState(false)
@@ -96,6 +102,9 @@ export function SignUpForm({
 
   const emailValue = form.watch('email')
   const emailVerificationRequired = !!status?.email_verification
+  const registrationCodeRequired = !!(
+    status?.registration_code_enabled ?? status?.data?.registration_code_enabled
+  )
   const hasUserAgreement = Boolean(status?.user_agreement_enabled)
   const hasPrivacyPolicy = Boolean(status?.privacy_policy_enabled)
   const requiresLegalConsent = hasUserAgreement || hasPrivacyPolicy
@@ -135,6 +144,15 @@ export function SignUpForm({
     }
   }, [])
 
+  useEffect(() => {
+    const cleanCode = registrationCode.trim()
+    if (cleanCode) {
+      saveRegistrationCode(cleanCode)
+    } else {
+      removeRegistrationCode()
+    }
+  }, [registrationCode])
+
   async function onSubmit(data: z.infer<typeof registerFormSchema>) {
     if (requiresLegalConsent && !agreedToLegal) {
       toast.error(legalConsentErrorMessage)
@@ -154,6 +172,10 @@ export function SignUpForm({
     }
 
     if (!validateTurnstile()) return
+    if (registrationCodeRequired && !registrationCode.trim()) {
+      toast.error(t('Please enter the registration code'))
+      return
+    }
 
     setIsLoading(true)
     try {
@@ -162,11 +184,13 @@ export function SignUpForm({
         password: data.password,
         email: data.email || undefined,
         verification_code: verificationCode || undefined,
+        registration_code: registrationCode.trim() || undefined,
         aff_code: getAffiliateCode(),
         turnstile: turnstileToken,
       })
 
       if (res?.success) {
+        removeRegistrationCode()
         toast.success(t('Account created! Please sign in'))
         redirectToLogin()
       } else {
@@ -186,6 +210,10 @@ export function SignUpForm({
   const handleOpenWeChatDialog = () => {
     if (requiresLegalConsent && !agreedToLegal) {
       toast.error(legalConsentErrorMessage)
+      return
+    }
+    if (registrationCodeRequired && !registrationCode.trim()) {
+      toast.error(t('Please enter the registration code'))
       return
     }
 
@@ -210,6 +238,7 @@ export function SignUpForm({
     try {
       const res = await wechatLoginByCode(wechatCode)
       if (res?.success) {
+        removeRegistrationCode()
         await handleLoginSuccess(res.data as { id?: number } | null)
         toast.success(t('Signed in via WeChat'))
         handleWeChatDialogChange(false)
@@ -335,6 +364,19 @@ export function SignUpForm({
           </>
         )}
 
+        {registrationCodeRequired && (
+          <div className='grid gap-2'>
+            <Label htmlFor='registration-code'>{t('Registration Code')}</Label>
+            <Input
+              id='registration-code'
+              placeholder={t('Enter your registration code')}
+              value={registrationCode}
+              onChange={(event) => setRegistrationCode(event.target.value)}
+              autoComplete='one-time-code'
+            />
+          </div>
+        )}
+
         {/* Turnstile */}
         {isTurnstileEnabled && (
           <div className='mt-2'>
@@ -359,7 +401,8 @@ export function SignUpForm({
           disabled={
             isLoading ||
             (requiresLegalConsent && !agreedToLegal) ||
-            !turnstileReady
+            !turnstileReady ||
+            (registrationCodeRequired && !registrationCode.trim())
           }
         >
           {isLoading ? <Loader2 className='h-4 w-4 animate-spin' /> : null}
@@ -369,7 +412,11 @@ export function SignUpForm({
         {oauthRegisterEnabled && (
           <OAuthProviders
             status={status}
-            disabled={isLoading || (requiresLegalConsent && !agreedToLegal)}
+            disabled={
+              isLoading ||
+              (requiresLegalConsent && !agreedToLegal) ||
+              (registrationCodeRequired && !registrationCode.trim())
+            }
             onWeChatLogin={hasWeChatLogin ? handleOpenWeChatDialog : undefined}
             isWeChatLoading={isWeChatSubmitting}
             className='pt-2'
