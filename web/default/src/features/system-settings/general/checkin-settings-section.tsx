@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useEffect } from 'react'
 import { useForm, type Resolver } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -33,6 +34,12 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
+import { getCurrencyDisplay, getCurrencyLabel } from '@/lib/currency'
+import {
+  formatQuota,
+  parseQuotaFromDollars,
+  quotaUnitsToDollars,
+} from '@/lib/format'
 
 import {
   SettingsForm,
@@ -45,8 +52,8 @@ import { useUpdateOption } from '../hooks/use-update-option'
 
 const schema = z.object({
   enabled: z.boolean(),
-  minQuota: z.coerce.number().int().min(0),
-  maxQuota: z.coerce.number().int().min(0),
+  minAmount: z.coerce.number().min(0),
+  maxAmount: z.coerce.number().min(0),
 })
 
 type Values = z.infer<typeof schema>
@@ -62,20 +69,41 @@ export function CheckinSettingsSection({
 }) {
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
+  const { meta: currencyMeta } = getCurrencyDisplay()
+  const currencyLabel = getCurrencyLabel()
+  const tokensOnly = currencyMeta.kind === 'tokens'
+
+  const initialValues: Values = {
+    enabled: defaultValues.enabled,
+    minAmount: quotaUnitsToDollars(defaultValues.minQuota),
+    maxAmount: quotaUnitsToDollars(defaultValues.maxQuota),
+  }
 
   const form = useForm<Values>({
     resolver: zodResolver(schema) as unknown as Resolver<Values>,
-    defaultValues: {
-      enabled: defaultValues.enabled,
-      minQuota: defaultValues.minQuota,
-      maxQuota: defaultValues.maxQuota,
-    },
+    defaultValues: initialValues,
   })
 
   const { isDirty, isSubmitting } = form.formState
   const enabled = form.watch('enabled')
 
+  useEffect(() => {
+    form.reset(initialValues)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultValues.enabled, defaultValues.minQuota, defaultValues.maxQuota])
+
   async function onSubmit(values: Values) {
+    if (values.maxAmount < values.minAmount) {
+      toast.error(
+        t(
+          'Maximum check-in reward must be greater than or equal to minimum reward'
+        )
+      )
+      return
+    }
+
+    const minQuota = parseQuotaFromDollars(values.minAmount)
+    const maxQuota = parseQuotaFromDollars(values.maxAmount)
     const updates: Array<{ key: string; value: string }> = []
 
     if (values.enabled !== defaultValues.enabled) {
@@ -85,17 +113,17 @@ export function CheckinSettingsSection({
       })
     }
 
-    if (values.minQuota !== defaultValues.minQuota) {
+    if (minQuota !== defaultValues.minQuota) {
       updates.push({
         key: 'checkin_setting.min_quota',
-        value: String(values.minQuota),
+        value: String(minQuota),
       })
     }
 
-    if (values.maxQuota !== defaultValues.maxQuota) {
+    if (maxQuota !== defaultValues.maxQuota) {
       updates.push({
         key: 'checkin_setting.max_quota',
-        value: String(values.maxQuota),
+        value: String(maxQuota),
       })
     }
 
@@ -110,6 +138,12 @@ export function CheckinSettingsSection({
 
     form.reset(values)
   }
+
+  const amountPlaceholder = tokensOnly
+    ? t('Enter amount in tokens')
+    : t('Enter amount in {{currency}}', { currency: currencyLabel })
+  const previewQuota = (value: unknown) =>
+    formatQuota(parseQuotaFromDollars(Number(value) || 0))
 
   return (
     <SettingsSection title={t('Check-in Settings')}>
@@ -149,20 +183,25 @@ export function CheckinSettingsSection({
             <div className='grid gap-6 sm:grid-cols-2'>
               <FormField
                 control={form.control}
-                name='minQuota'
+                name='minAmount'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('Minimum check-in quota')}</FormLabel>
+                    <FormLabel>
+                      {t('Minimum check-in reward')} ({currencyLabel})
+                    </FormLabel>
                     <FormControl>
                       <Input
                         type='number'
                         min={0}
-                        placeholder={t('1000')}
+                        step={tokensOnly ? 1 : 0.01}
+                        placeholder={amountPlaceholder}
                         {...field}
                       />
                     </FormControl>
                     <FormDescription>
-                      {t('Minimum quota amount awarded for check-in')}
+                      {t('Saved as {{quota}} raw quota', {
+                        quota: previewQuota(field.value),
+                      })}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -171,20 +210,25 @@ export function CheckinSettingsSection({
 
               <FormField
                 control={form.control}
-                name='maxQuota'
+                name='maxAmount'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('Maximum check-in quota')}</FormLabel>
+                    <FormLabel>
+                      {t('Maximum check-in reward')} ({currencyLabel})
+                    </FormLabel>
                     <FormControl>
                       <Input
                         type='number'
                         min={0}
-                        placeholder={t('10000')}
+                        step={tokensOnly ? 1 : 0.01}
+                        placeholder={amountPlaceholder}
                         {...field}
                       />
                     </FormControl>
                     <FormDescription>
-                      {t('Maximum quota amount awarded for check-in')}
+                      {t('Saved as {{quota}} raw quota', {
+                        quota: previewQuota(field.value),
+                      })}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
