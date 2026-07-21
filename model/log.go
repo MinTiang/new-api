@@ -279,42 +279,48 @@ func RecordTopupLog(userId int, content string, callerIp string, paymentMethod s
 	}
 }
 
+func appendRequestClientInfo(c *gin.Context, other map[string]interface{}) {
+	if c == nil || c.Request == nil || other == nil {
+		return
+	}
+	userAgent := strings.TrimSpace(c.Request.UserAgent())
+	const maxUserAgentLength = 1024
+	if len(userAgent) > maxUserAgentLength {
+		userAgent = userAgent[:maxUserAgentLength]
+	}
+	if userAgent != "" {
+		other["user_agent"] = userAgent
+	}
+}
+
 func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string, tokenName string, content string, tokenId int, useTimeSeconds int,
 	isStream bool, group string, other map[string]interface{}) {
 	logger.LogInfo(c, fmt.Sprintf("record error log: userId=%d, channelId=%d, modelName=%s, tokenName=%s, content=%s", userId, channelId, modelName, tokenName, common.LocalLogPreview(content)))
 	username := c.GetString("username")
 	requestId := c.GetString(common.RequestIdKey)
 	upstreamRequestId := c.GetString(common.UpstreamRequestIdKey)
-	otherStr := common.MapToJsonStr(other)
-	// 判断是否需要记录 IP
-	needRecordIp := false
-	if settingMap, err := GetUserSetting(userId, false); err == nil {
-		if settingMap.RecordIpLog {
-			needRecordIp = true
-		}
+	if other == nil {
+		other = make(map[string]interface{})
 	}
+	appendRequestClientInfo(c, other)
+	otherStr := common.MapToJsonStr(other)
 	log := &Log{
-		UserId:           userId,
-		Username:         username,
-		CreatedAt:        common.GetTimestamp(),
-		Type:             LogTypeError,
-		Content:          content,
-		PromptTokens:     0,
-		CompletionTokens: 0,
-		TokenName:        tokenName,
-		ModelName:        modelName,
-		Quota:            0,
-		ChannelId:        channelId,
-		TokenId:          tokenId,
-		UseTime:          useTimeSeconds,
-		IsStream:         isStream,
-		Group:            group,
-		Ip: func() string {
-			if needRecordIp {
-				return c.ClientIP()
-			}
-			return ""
-		}(),
+		UserId:            userId,
+		Username:          username,
+		CreatedAt:         common.GetTimestamp(),
+		Type:              LogTypeError,
+		Content:           content,
+		PromptTokens:      0,
+		CompletionTokens:  0,
+		TokenName:         tokenName,
+		ModelName:         modelName,
+		Quota:             0,
+		ChannelId:         channelId,
+		TokenId:           tokenId,
+		UseTime:           useTimeSeconds,
+		IsStream:          isStream,
+		Group:             group,
+		Ip:                common.GetClientIP(c),
 		RequestId:         requestId,
 		UpstreamRequestId: upstreamRequestId,
 		Other:             otherStr,
@@ -349,36 +355,28 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 	requestId := c.GetString(common.RequestIdKey)
 	upstreamRequestId := c.GetString(common.UpstreamRequestIdKey)
 	createdAt := common.GetTimestamp()
-	otherStr := common.MapToJsonStr(params.Other)
-	// 判断是否需要记录 IP
-	needRecordIp := false
-	if settingMap, err := GetUserSetting(userId, false); err == nil {
-		if settingMap.RecordIpLog {
-			needRecordIp = true
-		}
+	if params.Other == nil {
+		params.Other = make(map[string]interface{})
 	}
+	appendRequestClientInfo(c, params.Other)
+	otherStr := common.MapToJsonStr(params.Other)
 	log := &Log{
-		UserId:           userId,
-		Username:         username,
-		CreatedAt:        createdAt,
-		Type:             LogTypeConsume,
-		Content:          params.Content,
-		PromptTokens:     params.PromptTokens,
-		CompletionTokens: params.CompletionTokens,
-		TokenName:        params.TokenName,
-		ModelName:        params.ModelName,
-		Quota:            params.Quota,
-		ChannelId:        params.ChannelId,
-		TokenId:          params.TokenId,
-		UseTime:          params.UseTimeSeconds,
-		IsStream:         params.IsStream,
-		Group:            params.Group,
-		Ip: func() string {
-			if needRecordIp {
-				return c.ClientIP()
-			}
-			return ""
-		}(),
+		UserId:            userId,
+		Username:          username,
+		CreatedAt:         createdAt,
+		Type:              LogTypeConsume,
+		Content:           params.Content,
+		PromptTokens:      params.PromptTokens,
+		CompletionTokens:  params.CompletionTokens,
+		TokenName:         params.TokenName,
+		ModelName:         params.ModelName,
+		Quota:             params.Quota,
+		ChannelId:         params.ChannelId,
+		TokenId:           params.TokenId,
+		UseTime:           params.UseTimeSeconds,
+		IsStream:          params.IsStream,
+		Group:             params.Group,
+		Ip:                common.GetClientIP(c),
 		RequestId:         requestId,
 		UpstreamRequestId: upstreamRequestId,
 		Other:             otherStr,
@@ -613,6 +611,158 @@ type Stat struct {
 	Quota int `json:"quota"`
 	Rpm   int `json:"rpm"`
 	Tpm   int `json:"tpm"`
+}
+
+type RequestEndpointStat struct {
+	Path                string  `json:"path"`
+	Requests            int64   `json:"requests"`
+	Success             int64   `json:"success"`
+	Failed              int64   `json:"failed"`
+	PromptTokens        int64   `json:"prompt_tokens"`
+	CompletionTokens    int64   `json:"completion_tokens"`
+	TotalTokens         int64   `json:"total_tokens"`
+	Quota               int64   `json:"quota"`
+	AverageResponseTime float64 `json:"average_response_time"`
+	totalUseTime        int64
+}
+
+type RequestEndpointStats struct {
+	Items               []RequestEndpointStat `json:"items"`
+	Requests            int64                 `json:"requests"`
+	Success             int64                 `json:"success"`
+	Failed              int64                 `json:"failed"`
+	TotalTokens         int64                 `json:"total_tokens"`
+	Quota               int64                 `json:"quota"`
+	AverageResponseTime float64               `json:"average_response_time"`
+	totalUseTime        int64
+}
+
+func normalizeAIRequestPath(path string) (string, bool) {
+	path = strings.TrimSuffix(strings.TrimSpace(path), "/")
+	switch path {
+	case "/v1/message", "/v1/messages":
+		return "/v1/messages", true
+	case "/v1/responses":
+		return "/v1/responses", true
+	case "/v1/chat/completions":
+		return "/v1/chat/completions", true
+	default:
+		return "", false
+	}
+}
+
+func GetRequestEndpointStats(userId int, startTimestamp int64, endTimestamp int64) (RequestEndpointStats, error) {
+	stats := RequestEndpointStats{
+		Items: []RequestEndpointStat{
+			{Path: "/v1/messages"},
+			{Path: "/v1/responses"},
+			{Path: "/v1/chat/completions"},
+		},
+	}
+	pathIndexes := make(map[string]int, len(stats.Items))
+	for i := range stats.Items {
+		pathIndexes[stats.Items[i].Path] = i
+	}
+
+	query := LOG_DB.Model(&Log{}).
+		Select("user_id, type, other, request_id, prompt_tokens, completion_tokens, quota, use_time").
+		Where("type IN ?", []int{LogTypeConsume, LogTypeError}).
+		Where("other LIKE ?", "%\"request_path\"%")
+	if userId > 0 {
+		query = query.Where("user_id = ?", userId)
+	}
+	if startTimestamp > 0 {
+		query = query.Where("created_at >= ?", startTimestamp)
+	}
+	if endTimestamp > 0 {
+		query = query.Where("created_at <= ?", endTimestamp)
+	}
+
+	rows, err := query.Rows()
+	if err != nil {
+		return stats, err
+	}
+	defer rows.Close()
+
+	type requestAggregate struct {
+		path             string
+		success          bool
+		promptTokens     int64
+		completionTokens int64
+		quota            int64
+		useTime          int64
+	}
+	requests := make(map[string]*requestAggregate)
+	rowNumber := 0
+	for rows.Next() {
+		rowNumber++
+		var log Log
+		if err = LOG_DB.ScanRows(rows, &log); err != nil {
+			return stats, err
+		}
+		other, _ := common.StrToMap(log.Other)
+		requestPath, ok := other["request_path"].(string)
+		if !ok {
+			continue
+		}
+		requestPath, ok = normalizeAIRequestPath(requestPath)
+		if !ok {
+			continue
+		}
+
+		requestKey := fmt.Sprintf("%d\x00%s\x00%s", log.UserId, log.RequestId, requestPath)
+		if log.RequestId == "" {
+			requestKey = fmt.Sprintf("row:%d", rowNumber)
+		}
+		request := requests[requestKey]
+		if request == nil {
+			request = &requestAggregate{path: requestPath}
+			requests[requestKey] = request
+		}
+		if log.Type == LogTypeConsume {
+			request.success = true
+			request.promptTokens = int64(log.PromptTokens)
+			request.completionTokens = int64(log.CompletionTokens)
+			request.quota = int64(log.Quota)
+			request.useTime = int64(log.UseTime)
+		} else if !request.success && int64(log.UseTime) > request.useTime {
+			request.useTime = int64(log.UseTime)
+		}
+	}
+	if err = rows.Err(); err != nil {
+		return stats, err
+	}
+
+	for _, request := range requests {
+		item := &stats.Items[pathIndexes[request.path]]
+		item.Requests++
+		stats.Requests++
+		if request.success {
+			item.Success++
+			stats.Success++
+		} else {
+			item.Failed++
+			stats.Failed++
+		}
+		item.PromptTokens += request.promptTokens
+		item.CompletionTokens += request.completionTokens
+		item.TotalTokens += request.promptTokens + request.completionTokens
+		item.Quota += request.quota
+		item.totalUseTime += request.useTime
+		stats.TotalTokens += request.promptTokens + request.completionTokens
+		stats.Quota += request.quota
+		stats.totalUseTime += request.useTime
+	}
+
+	for i := range stats.Items {
+		if stats.Items[i].Requests > 0 {
+			stats.Items[i].AverageResponseTime = float64(stats.Items[i].totalUseTime) / float64(stats.Items[i].Requests)
+		}
+	}
+	if stats.Requests > 0 {
+		stats.AverageResponseTime = float64(stats.totalUseTime) / float64(stats.Requests)
+	}
+	return stats, nil
 }
 
 func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, channel int, group string) (stat Stat, err error) {

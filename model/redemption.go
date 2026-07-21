@@ -74,10 +74,24 @@ func SearchRedemptions(keyword string, status string, startIdx int, num int) (re
 	query := tx.Model(&Redemption{})
 
 	if keyword != "" {
+		keyCol := "`key`"
+		if common.UsingMainDatabase(common.DatabaseTypePostgreSQL) {
+			keyCol = `"key"`
+		}
+		keyLike := "%" + keyword + "%"
 		if id, err := strconv.Atoi(keyword); err == nil {
-			query = query.Where("id = ? OR name LIKE ?", id, keyword+"%")
+			query = query.Where(
+				"id = ? OR name LIKE ? OR "+keyCol+" LIKE ?",
+				id,
+				keyword+"%",
+				keyLike,
+			)
 		} else {
-			query = query.Where("name LIKE ?", keyword+"%")
+			query = query.Where(
+				"name LIKE ? OR "+keyCol+" LIKE ?",
+				keyword+"%",
+				keyLike,
+			)
 		}
 	}
 

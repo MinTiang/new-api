@@ -21,7 +21,7 @@ func TestSearchRedemptionsFiltersAndPaginates(t *testing.T) {
 	redemptions := []Redemption{
 		{Id: 1, Name: "alpha-active", Key: "00000000000000000000000000000001", Status: common.RedemptionCodeStatusEnabled, ExpiredTime: 0},
 		{Id: 2, Name: "alpha-future", Key: "00000000000000000000000000000002", Status: common.RedemptionCodeStatusEnabled, ExpiredTime: now + 3600},
-		{Id: 3, Name: "alpha-expired", Key: "00000000000000000000000000000003", Status: common.RedemptionCodeStatusEnabled, ExpiredTime: now - 10},
+		{Id: 3, Name: "alpha-expired", Key: "000000000000000000needle000003", Status: common.RedemptionCodeStatusEnabled, ExpiredTime: now - 10},
 		{Id: 4, Name: "beta-disabled", Key: "00000000000000000000000000000004", Status: common.RedemptionCodeStatusDisabled, ExpiredTime: 0},
 		{Id: 5, Name: "beta-used", Key: "00000000000000000000000000000005", Status: common.RedemptionCodeStatusUsed, ExpiredTime: 0},
 	}
@@ -48,6 +48,13 @@ func TestSearchRedemptionsFiltersAndPaginates(t *testing.T) {
 			num:       10,
 			wantTotal: 3,
 			wantIds:   []int{3, 2, 1},
+		},
+		{
+			name:      "keyword filters by code substring",
+			keyword:   "needle",
+			num:       10,
+			wantTotal: 1,
+			wantIds:   []int{3},
 		},
 		{
 			name:      "enabled status excludes expired rows",

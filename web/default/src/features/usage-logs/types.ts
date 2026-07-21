@@ -345,6 +345,39 @@ export interface GetLogStatsResponse {
   data?: LogStatistics
 }
 
+export interface RequestEndpointStat {
+  path: string
+  requests: number
+  success: number
+  failed: number
+  prompt_tokens: number
+  completion_tokens: number
+  total_tokens: number
+  quota: number
+  average_response_time: number
+}
+
+export interface RequestEndpointStats {
+  items: RequestEndpointStat[]
+  requests: number
+  success: number
+  failed: number
+  total_tokens: number
+  quota: number
+  average_response_time: number
+}
+
+export interface GetRequestEndpointStatsParams {
+  start_timestamp?: number
+  end_timestamp?: number
+}
+
+export interface GetRequestEndpointStatsResponse {
+  success: boolean
+  message?: string
+  data?: RequestEndpointStats
+}
+
 // ============================================================================
 // Drawing Log Types
 // ============================================================================

@@ -18,16 +18,27 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { api } from '@/lib/api'
 
-import { buildQueryParams } from './lib/utils'
 import type {
   GetLogsParams,
   GetLogsResponse,
   GetLogStatsParams,
   GetLogStatsResponse,
+  GetRequestEndpointStatsParams,
+  GetRequestEndpointStatsResponse,
   GetMidjourneyLogsParams,
   GetTaskLogsParams,
   UserInfo,
 } from './types'
+
+function buildQueryParams(params: Record<string, unknown>): URLSearchParams {
+  const queryParams = new URLSearchParams()
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      queryParams.append(key, String(value))
+    }
+  })
+  return queryParams
+}
 
 // ============================================================================
 // Generic API Helpers
@@ -83,6 +94,20 @@ export const getLogStats = (params: GetLogStatsParams = {}) =>
 export const getUserLogStats = (
   params: Omit<GetLogStatsParams, 'username' | 'channel'> = {}
 ) => fetchLogStats('/api/log', params, false)
+
+export async function getRequestEndpointStats(
+  params: GetRequestEndpointStatsParams,
+  isAdmin: boolean
+): Promise<GetRequestEndpointStatsResponse> {
+  const queryParams = buildQueryParams(
+    params as unknown as Record<string, unknown>
+  )
+  const endpoint = isAdmin
+    ? '/api/log/request-stats'
+    : '/api/log/self/request-stats'
+  const res = await api.get(`${endpoint}?${queryParams}`)
+  return res.data
+}
 
 export async function getUserInfo(
   userId: number

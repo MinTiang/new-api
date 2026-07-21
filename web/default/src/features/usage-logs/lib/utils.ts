@@ -73,13 +73,13 @@ export function isPerCallBilling(modelPrice?: number): boolean {
 }
 
 /**
- * Get default time range (today 00:00:00 to now + 1 hour)
+ * Get default time range (today 00:00:00 to now)
  */
 export function getDefaultTimeRange(): { start: Date; end: Date } {
   const now = new Date()
   const start = new Date(now)
   start.setHours(0, 0, 0, 0)
-  const end = new Date(now.getTime() + 3600 * 1000) // +1 hour
+  const end = now
 
   return { start, end }
 }
@@ -89,24 +89,6 @@ export function getDefaultTimeRange(): { start: Date; end: Date } {
  */
 function timestampToSeconds(ms: number): number {
   return Math.floor(ms / 1000)
-}
-
-/**
- * Build query parameters from filters
- */
-export function buildQueryParams(
-  params: Record<string, unknown>
-): URLSearchParams {
-  const queryParams = new URLSearchParams()
-
-  Object.entries(params).forEach(([key, value]) => {
-    // Keep 0 as a valid value, only filter out undefined, null, and empty string
-    if (value !== undefined && value !== null && value !== '') {
-      queryParams.append(key, String(value))
-    }
-  })
-
-  return queryParams
 }
 
 /**

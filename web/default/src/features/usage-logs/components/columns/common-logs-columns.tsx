@@ -540,6 +540,55 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
     )
   }
 
+  columns.push(
+    {
+      accessorKey: 'ip',
+      header: t('IP Address'),
+      cell: ({ row }) => {
+        const ip = row.original.ip
+        if (!ip) return <span className='text-muted-foreground text-xs'>-</span>
+        return (
+          <StatusBadge
+            label={ip}
+            copyText={ip}
+            size='sm'
+            showDot={false}
+            className='font-mono'
+          />
+        )
+      },
+      size: 160,
+    },
+    {
+      id: 'user_agent',
+      accessorFn: (row) => parseLogOther(row.other)?.user_agent || '',
+      header: t('User Agent'),
+      cell: ({ row }) => {
+        const userAgent = parseLogOther(row.original.other)?.user_agent
+        if (!userAgent) {
+          return <span className='text-muted-foreground text-xs'>-</span>
+        }
+        return (
+          <TooltipProvider delay={300}>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <span className='block max-w-[220px] truncate font-mono text-xs' />
+                }
+              >
+                {userAgent}
+              </TooltipTrigger>
+              <TooltipContent className='max-w-md break-all'>
+                {userAgent}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )
+      },
+      size: 240,
+    }
+  )
+
   columns.push({
     accessorKey: 'token_name',
     header: t('Token'),

@@ -1,8 +1,10 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
@@ -148,6 +150,44 @@ func GetLogsSelfStat(c *gin.Context) {
 		},
 	})
 	return
+}
+
+func getRequestStatsTimeRange(c *gin.Context) (int64, int64, error) {
+	now := time.Now()
+	startTimestamp, _ := strconv.ParseInt(c.Query("start_timestamp"), 10, 64)
+	endTimestamp, _ := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
+	if startTimestamp == 0 {
+		startTimestamp = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).Unix()
+	}
+	if endTimestamp == 0 {
+		endTimestamp = now.Unix()
+	}
+	if startTimestamp > endTimestamp {
+		return 0, 0, errors.New("start_timestamp must not be greater than end_timestamp")
+	}
+	return startTimestamp, endTimestamp, nil
+}
+
+func getRequestEndpointStats(c *gin.Context, userId int) {
+	startTimestamp, endTimestamp, err := getRequestStatsTimeRange(c)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	stats, err := model.GetRequestEndpointStats(userId, startTimestamp, endTimestamp)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, stats)
+}
+
+func GetRequestEndpointStats(c *gin.Context) {
+	getRequestEndpointStats(c, 0)
+}
+
+func GetRequestEndpointSelfStats(c *gin.Context) {
+	getRequestEndpointStats(c, c.GetInt("id"))
 }
 
 // DeleteHistoryLogs is the legacy synchronous log cleanup endpoint (DELETE /api/log/).

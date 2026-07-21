@@ -831,18 +831,7 @@ export const getLogsColumns = ({
     },
     {
       key: COLUMN_KEYS.IP,
-      title: (
-        <div className='flex items-center gap-1'>
-          {t('IP')}
-          <Tooltip
-            content={t(
-              '只有当用户设置开启IP记录时，才会进行请求和错误类型日志的IP记录',
-            )}
-          >
-            <IconHelpCircle className='text-gray-400 cursor-help' />
-          </Tooltip>
-        </div>
-      ),
+      title: t('IP'),
       dataIndex: 'ip',
       render: (text, record, index) => {
         const showIp =
@@ -862,6 +851,32 @@ export const getLogsColumns = ({
               >
                 {text}
               </Tag>
+            </span>
+          </Tooltip>
+        ) : (
+          <></>
+        );
+      },
+    },
+    {
+      key: COLUMN_KEYS.USER_AGENT,
+      title: 'User-Agent',
+      dataIndex: 'other',
+      render: (text, record) => {
+        const userAgent = getLogOther(record.other)?.user_agent;
+        return userAgent ? (
+          <Tooltip content={userAgent}>
+            <span
+              style={{
+                display: 'inline-block',
+                maxWidth: 240,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                verticalAlign: 'middle',
+              }}
+            >
+              {userAgent}
             </span>
           </Tooltip>
         ) : (

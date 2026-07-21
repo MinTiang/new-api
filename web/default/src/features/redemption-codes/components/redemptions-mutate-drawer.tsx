@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
-import { type FormEvent, useEffect, useState } from 'react'
+import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -50,12 +50,14 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import { Textarea } from '@/components/ui/textarea'
+import { copyToClipboard } from '@/lib/copy-to-clipboard'
 import { getCurrencyDisplay, getCurrencyLabel } from '@/lib/currency'
 import { formatQuota, parseQuotaFromDollars } from '@/lib/format'
 import { addTimeToDate } from '@/lib/time'
 
 import { createRedemption, updateRedemption, getRedemption } from '../api'
-import { SUCCESS_MESSAGES } from '../constants'
+import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants'
 import {
   getRedemptionFormSchema,
   type RedemptionFormValues,
@@ -63,7 +65,7 @@ import {
   transformFormDataToPayload,
   transformRedemptionToFormDefaults,
 } from '../lib'
-import { type Redemption } from '../types'
+import type { Redemption } from '../types'
 import { useRedemptions } from './redemptions-provider'
 
 type RedemptionsMutateDrawerProps = {
@@ -81,6 +83,7 @@ export function RedemptionsMutateDrawer({
   const isUpdate = !!currentRow
   const { triggerRefresh } = useRedemptions()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [generatedCodes, setGeneratedCodes] = useState<string[]>([])
 
   const form = useForm<RedemptionFormValues>({
     resolver: zodResolver(getRedemptionFormSchema(t)),
@@ -91,16 +94,24 @@ export function RedemptionsMutateDrawer({
   useEffect(() => {
     if (open && isUpdate && currentRow) {
       // For update, fetch fresh data
-      getRedemption(currentRow.id).then((result) => {
-        if (result.success && result.data) {
-          form.reset(transformRedemptionToFormDefaults(result.data))
-        }
-      })
+      void getRedemption(currentRow.id)
+        .then((result) => {
+          if (result.success && result.data) {
+            form.reset(transformRedemptionToFormDefaults(result.data))
+          }
+        })
+        .catch(() => toast.error(t(ERROR_MESSAGES.LOAD_FAILED)))
     } else if (open && !isUpdate) {
       // For create, reset to defaults
       form.reset(REDEMPTION_FORM_DEFAULT_VALUES)
+      setGeneratedCodes([])
     }
-  }, [open, isUpdate, currentRow, form])
+  }, [open, isUpdate, currentRow, form, t])
+
+  const generatedText = useMemo(
+    () => generatedCodes.join('\n'),
+    [generatedCodes]
+  )
 
   const onSubmit = async (data: RedemptionFormValues) => {
     setIsSubmitting(true)
@@ -121,7 +132,9 @@ export function RedemptionsMutateDrawer({
         // Create mode
         const result = await createRedemption(basePayload)
         if (result.success) {
-          const count = result.data?.length || 0
+          const keys = result.data ?? []
+          const count = keys.length
+          setGeneratedCodes(keys)
           toast.success(
             count > 1
               ? t('Successfully created {{count}} redemption codes', {
@@ -129,7 +142,7 @@ export function RedemptionsMutateDrawer({
                 })
               : t(SUCCESS_MESSAGES.REDEMPTION_CREATED)
           )
-          onOpenChange(false)
+          form.reset(REDEMPTION_FORM_DEFAULT_VALUES)
           triggerRefresh()
         }
       }
@@ -148,6 +161,12 @@ export function RedemptionsMutateDrawer({
     }
 
     void form.handleSubmit(onSubmit)(event)
+  }
+
+  const handleCopy = async (value: string) => {
+    const ok = await copyToClipboard(value)
+    if (ok) toast.success(t('Copied to clipboard'))
+    else toast.error(t('Failed to copy'))
   }
 
   const handleSetExpiry = (months: number, days: number, hours: number) => {
@@ -170,6 +189,7 @@ export function RedemptionsMutateDrawer({
         onOpenChange(v)
         if (!v) {
           form.reset()
+          setGeneratedCodes([])
         }
       }}
     >
@@ -226,7 +246,7 @@ export function RedemptionsMutateDrawer({
                         step={tokensOnly ? 1 : 0.01}
                         placeholder={quotaPlaceholder}
                         onChange={(e) =>
-                          field.onChange(parseFloat(e.target.value) || 0)
+                          field.onChange(Number.parseFloat(e.target.value) || 0)
                         }
                       />
                     </FormControl>
@@ -314,7 +334,9 @@ export function RedemptionsMutateDrawer({
                           max='100'
                           placeholder={t('Number of codes to create')}
                           onChange={(e) =>
-                            field.onChange(parseInt(e.target.value, 10) || 1)
+                            field.onChange(
+                              Number.parseInt(e.target.value, 10) || 1
+                            )
                           }
                         />
                       </FormControl>
@@ -325,6 +347,23 @@ export function RedemptionsMutateDrawer({
                     </FormItem>
                   )}
                 />
+              )}
+
+              {!isUpdate && generatedCodes.length > 0 && (
+                <div className='grid gap-2'>
+                  <div className='flex items-center justify-between gap-2'>
+                    <FormLabel>{t('Generated Redemption Codes')}</FormLabel>
+                    <Button
+                      type='button'
+                      size='sm'
+                      variant='outline'
+                      onClick={() => handleCopy(generatedText)}
+                    >
+                      {t('Copy All')}
+                    </Button>
+                  </div>
+                  <Textarea readOnly value={generatedText} rows={6} />
+                </div>
               )}
             </SideDrawerSection>
           </form>

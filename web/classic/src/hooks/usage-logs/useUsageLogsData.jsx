@@ -61,6 +61,7 @@ export const useLogsData = () => {
     COST: 'cost',
     RETRY: 'retry',
     IP: 'ip',
+    USER_AGENT: 'user_agent',
     DETAILS: 'details',
   };
 
@@ -124,6 +125,7 @@ export const useLogsData = () => {
       [COLUMN_KEYS.COST]: true,
       [COLUMN_KEYS.RETRY]: isAdminUser,
       [COLUMN_KEYS.IP]: true,
+      [COLUMN_KEYS.USER_AGENT]: true,
       [COLUMN_KEYS.DETAILS]: true,
     };
   };
@@ -531,6 +533,12 @@ export const useLogsData = () => {
         expandDataLocal.push({
           key: t('请求路径'),
           value: other.request_path,
+        });
+      }
+      if (other?.user_agent) {
+        expandDataLocal.push({
+          key: 'User-Agent',
+          value: other.user_agent,
         });
       }
       if (isAdminUser && other?.stream_status) {
