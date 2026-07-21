@@ -17,10 +17,19 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute, redirect } from '@tanstack/react-router'
+import z from 'zod'
 
 import { RegistrationCodes } from '@/features/registration-codes'
+import { REGISTRATION_CODE_FILTER_VALUES } from '@/features/registration-codes/types'
 import { ROLE } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth-store'
+
+const registrationCodesSearchSchema = z.object({
+  page: z.number().optional().catch(1),
+  pageSize: z.number().optional().catch(10),
+  filter: z.string().optional().catch(''),
+  status: z.array(z.enum(REGISTRATION_CODE_FILTER_VALUES)).optional().catch([]),
+})
 
 export const Route = createFileRoute('/_authenticated/registration-codes/')({
   beforeLoad: () => {
@@ -32,5 +41,6 @@ export const Route = createFileRoute('/_authenticated/registration-codes/')({
       })
     }
   },
+  validateSearch: registrationCodesSearchSchema,
   component: RegistrationCodes,
 })

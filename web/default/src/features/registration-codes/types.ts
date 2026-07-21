@@ -22,6 +22,13 @@ export const REGISTRATION_CODE_STATUS = {
   USED: 3,
 } as const
 
+export const REGISTRATION_CODE_FILTER_VALUES = [
+  '1',
+  '2',
+  '3',
+  'expired',
+] as const
+
 export type RegistrationCodeStatus =
   (typeof REGISTRATION_CODE_STATUS)[keyof typeof REGISTRATION_CODE_STATUS]
 
